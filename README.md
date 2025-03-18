@@ -50,4 +50,4 @@ To run the system, you will need:
 You can install the required Python dependencies with:
 
 ```bash
-pip install -r requirements.txt
+pip install openai
