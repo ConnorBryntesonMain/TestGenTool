@@ -116,7 +116,7 @@ def main(repo_url, clone_dir, single_file=None):
         cpp_c_files = [single_file] if single_file in cpp_c_files else []
 
     if not cpp_c_files:
-        print("❌ No matching source files found.")
+        print(" No matching source files found.")
         return
 
     # Step 1: Verify that existing test files compile before anything else
@@ -126,7 +126,7 @@ def main(repo_url, clone_dir, single_file=None):
             print(f"🔍 Checking if existing test compiles: {test_file}")
             if not compile_test_file(test_file):
                 print(
-                    f"❌ Existing test file '{test_file}' does not compile. Fix before proceeding."
+                    f" Existing test file '{test_file}' does not compile. Fix before proceeding."
                 )
                 return  # Stop execution if a test doesn't compile
 
@@ -139,7 +139,7 @@ def main(repo_url, clone_dir, single_file=None):
     test_files = [file for file in test_files if file]  # Remove None values
 
     if not test_files:
-        print("❌ No test files were successfully created.")
+        print(" No test files were successfully created.")
         return
 
     for source_file, test_file in zip(cpp_c_files, test_files):
@@ -160,8 +160,8 @@ def main(repo_url, clone_dir, single_file=None):
     removed_tests = remove_low_coverage_tests(clone_dir, before_covered, before_total)
 
     coverage_diff = after_covered - before_covered
-    print(f"\n✅ Test Coverage Improvement: {coverage_diff} more lines covered.")
-    print(f"✅ Total tests removed for low coverage impact: {removed_tests}")
+    print(f"\n Test Coverage Improvement: {coverage_diff} more lines covered.")
+    print(f" Total tests removed for low coverage impact: {removed_tests}")
 
 
 if __name__ == "__main__":
