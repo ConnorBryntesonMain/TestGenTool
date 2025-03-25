@@ -88,7 +88,7 @@ def generate_unit_tests(source_file, test_file):
     """
 
     response = client.chat.completions.create(
-        model="gpt-4-turbo",
+        model="gpt-4-turbo", # .12 per test file
         messages=[
             {
                 "role": "system",
@@ -131,7 +131,7 @@ def main(repo_url, clone_dir, single_file=None):
                 return  # Stop execution if a test doesn't compile
 
     # Step 2: Measure initial coverage (only if existing tests compile)
-    print("\n📏 Measuring initial coverage...")
+    print("\n Measuring initial coverage...")
     before_covered, before_total = measure_coverage(clone_dir, "Before")
 
     # Step 3: Generate new unit tests
@@ -153,7 +153,7 @@ def main(repo_url, clone_dir, single_file=None):
         cleanup_failed_tests(clone_dir)
 
     # Step 5: Measure final coverage
-    print("\n📏 Measuring final coverage...")
+    print("\n Measuring final coverage...")
     after_covered, after_total = measure_coverage(clone_dir, "After")
 
     # Step 6: Remove low-impact tests
