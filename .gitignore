@@ -1,1 +1,4 @@
 cloned_repo
+.vscode
+.venv
+filters/__pycache__

@@ -1,19 +1,37 @@
 import os
 import subprocess
-
+import platform
 
 def compile_test_file(test_file):
     """Attempts to compile a C++ test file. Returns True if successful, False otherwise."""
     output_exe = test_file.replace(".cpp", "")
+    if platform.system() == "Windows":
+        output_exe += ".exe"
+        
+    # Basic compilation command
     compile_command = [
-        "g++",
+        "mpic++",
         test_file,
         "-o",
         output_exe,
-        "-std=c++11",
-        "-I/usr/include/mpi",
-        "-lmpi",
+        "-std=c++11"
     ]
+    
+    # Add MPI flags only if MPI is likely available (check for mpicc)
+    try:
+        # Check if MPI is installed by looking for mpicc
+        mpi_check = subprocess.run(
+            ["which", "mpicc"] if platform.system() != "Windows" else ["where", "mpicc"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+        if mpi_check.returncode == 0:
+            compile_command.extend(["-I/usr/include/mpi", "-lmpi"])
+    except:
+        # MPI not found, continue without MPI flags
+        pass
+
+    # Add coverage flags for gcov compatibility
+    compile_command.extend(["-fprofile-arcs", "-ftest-coverage"])
 
     try:
         result = subprocess.run(
@@ -22,7 +40,9 @@ def compile_test_file(test_file):
         print(f"Compiled: {test_file} -> {output_exe}")
         return True
     except subprocess.CalledProcessError as e:
-        print(f"Failed to compile: {test_file}\nError: {e.stderr.decode()}")
+        print(f"Failed to compile: {test_file}")
+        error_message = e.stderr.decode() if hasattr(e, 'stderr') else str(e)
+        print(f"Error: {error_message}")
         return False
 
 
@@ -39,13 +59,16 @@ def cleanup_failed_tests(path):
         ]
     else:
         print(f"Invalid path: {path}")
-        return
+        return 0  # Return 0 to indicate no tests were processed
 
     total_tests = len(test_files)
     removed_tests = 0
 
     for test_file in test_files:
         output_exe = test_file.replace(".cpp", "")  # Executable name
+        if platform.system() == "Windows":
+            output_exe += ".exe"
+            
         if not compile_test_file(test_file):
             if os.path.exists(test_file):
                 os.remove(test_file)
@@ -59,8 +82,16 @@ def cleanup_failed_tests(path):
 
     print(f"\nTotal test files checked: {total_tests}")
     print(f"Total test files removed: {removed_tests}")
+    return removed_tests
 
 
 if __name__ == "__main__":
-    test_path = "cloned_repo/src/ComputeSPMV_ref_test.cpp"
-    cleanup_failed_tests(test_path)
+    test_path = "cloned_repo"  # Default directory
+    
+    # Check if directory exists, create if not
+    if not os.path.exists(test_path):
+        os.makedirs(test_path)
+        print(f"Created directory: {test_path}")
+        print("No test files found to process.")
+    else:
+        cleanup_failed_tests(test_path)
