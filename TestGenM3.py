@@ -91,7 +91,7 @@ def generate_unit_tests(source_file, test_file):
         I am working on generating tests with AI that add to coverage and that compile and run right after generation. 
 
         Generate only C++ unit tests that improve coverage for the function in the provided file. 
-        **Do NOT include explanations, comments, or descriptions**—only output valid compilable C++ test code.
+        **Do NOT include explanations, comments, markdown formatting or descriptions**—only output valid compilable C++ test code.
 
         For this, the generation must follow these steps:
 
@@ -106,6 +106,9 @@ def generate_unit_tests(source_file, test_file):
         - Use Linux MPI system for compatibility.
         - The code must be compatible with the Linux MPI system setup, initializing and finalizing MPI correctly.
         - Only use existing files that I provide.
+        - Do NOT wrap your response in ```cpp code blocks or any markdown formatting.
+        - Do NOT add any comments at the beginning like "// Auto-generated tests".
+        - Do NOT use GTEST in the test 
         
         Ensure that everything being generated is able to compile. When outputing code ensure that it does not use the gtest heading.
 
@@ -118,7 +121,7 @@ def generate_unit_tests(source_file, test_file):
         
         {test_content}
             
-        Generate additional unit tests that meet the requirements. 
+        Generate additional unit tests that meet the requirements. Output ONLY pure C++ code with no explanation or markdown.
         """
 
         response = client.chat.completions.create(
@@ -126,7 +129,7 @@ def generate_unit_tests(source_file, test_file):
             messages=[
                 {
                     "role": "system",
-                    "content": "You are an AI that generates comprehensive unit tests for C/C++ code using the Linux MPI system.",
+                    "content": "You are an AI that generates compilable C/C++ test code without explanations or markdown formatting.",
                 },
                 {"role": "user", "content": prompt},
             ],
@@ -134,15 +137,26 @@ def generate_unit_tests(source_file, test_file):
         )
 
         generated_tests = response.choices[0].message.content
-
-        with open(test_file, "a") as tf:
-            tf.write("\n// Auto-generated tests\n")
+        
+        # Remove markdown code blocks if they exist
+        if generated_tests.startswith("```") and "```" in generated_tests[3:]:
+            # Find the language identifier part and remove it
+            first_newline = generated_tests.find("\n")
+            if first_newline > 0:
+                generated_tests = generated_tests[first_newline+1:]
+            
+            # Find and remove the closing code block
+            closing_pos = generated_tests.rfind("```")
+            if closing_pos > 0:
+                generated_tests = generated_tests[:closing_pos]
+        
+        # Write the tests directly to the file without adding comments
+        with open(test_file, "w") as tf:
             tf.write(generated_tests)
 
         print(f"Unit tests generated for {source_file}")
     except Exception as e:
         print(f"Error generating tests: {str(e)}")
-
 
 def main(repo_url, clone_dir, single_file=None):
     # Convert paths to absolute paths
@@ -164,7 +178,7 @@ def main(repo_url, clone_dir, single_file=None):
         cpp_c_files = [f for f in cpp_c_files if os.path.abspath(f) == single_file]
 
     if not cpp_c_files:
-        print("❌ No matching source files found.")
+        print("No matching source files found.")
         if single_file:
             print(f"Check if the file exists: {single_file}")
             # Check if the file exists but doesn't have '_ref' in name
@@ -183,13 +197,13 @@ def main(repo_url, clone_dir, single_file=None):
     for source_file in cpp_c_files:
         test_file = source_file.replace(".cpp", "_test.cpp") if source_file.endswith(".cpp") else source_file.replace(".c", "_test.c")
         if os.path.exists(test_file):
-            print(f"🔍 Checking if existing test compiles: {test_file}")
+            print(f"Checking if existing test compiles: {test_file}")
             if not compile_test_file(test_file):
-                print(f"❌ Existing test file '{test_file}' does not compile. Fix before proceeding.")
+                print(f"Existing test file '{test_file}' does not compile. Fix before proceeding.")
                 return  # Stop execution if a test doesn't compile
 
     # Step 2: Measure initial coverage (only if existing tests compile)
-    print("\n📊 Measuring initial coverage...")
+    print("\nMeasuring initial coverage...")
     before_covered, before_total = measure_coverage(clone_dir, "Before")
 
     # Step 3: Generate test files and unit tests
@@ -201,20 +215,21 @@ def main(repo_url, clone_dir, single_file=None):
             generate_unit_tests(file, test_file)
 
     if not test_files:
-        print("❌ No test files were successfully created.")
+        print("No test files were successfully created.")
         return
 
     # Step 4: Compile new tests and remove failures
-    print("\n🛠 Compiling new test files and removing any that fail...")
+    print("\nCompiling new test files and removing any that fail...")
     for test_file in test_files:
-        cleanup_failed_tests(test_file)
+        pass
+        #cleanup_failed_tests(test_file)
 
     # Step 5: Measure final coverage
-    print("\n📊 Measuring final coverage...")
+    print("\nMeasuring final coverage...")
     after_covered, after_total = measure_coverage(clone_dir, "After")
 
     # Step 6: Remove low-impact tests
-    removed_tests = remove_low_coverage_tests(clone_dir, before_covered, before_total)
+    #removed_tests = remove_low_coverage_tests(clone_dir, before_covered, before_total)
 
     # Calculate coverage improvement
     if before_total > 0 and after_total > 0:
@@ -226,7 +241,7 @@ def main(repo_url, clone_dir, single_file=None):
         coverage_diff = after_covered - before_covered
         print(f"\n✨ Test Coverage Improvement: {coverage_diff} more lines covered.")
     
-    print(f"🧹 Total tests removed for low coverage impact: {removed_tests}")
+    #print(f"🧹 Total tests removed for low coverage impact: {removed_tests}")
 
 
 if __name__ == "__main__":

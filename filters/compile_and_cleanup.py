@@ -3,46 +3,70 @@ import subprocess
 import platform
 
 def compile_test_file(test_file):
-    """Attempts to compile a C++ test file. Returns True if successful, False otherwise."""
-    output_exe = test_file.replace(".cpp", "")
-    if platform.system() == "Windows":
-        output_exe += ".exe"
+    """Compiles the test file with appropriate flags."""
+    try:
+        source_dir = os.path.dirname(test_file)
+        build_dir = os.path.join(os.path.dirname(source_dir), "build")
         
-    # Basic compilation command
-    compile_command = [
-        "mpic++",
-        test_file,
-        "-o",
-        output_exe,
-        "-std=c++11"
-    ]
-    
-    # Add MPI flags only if MPI is likely available (check for mpicc)
-    try:
-        # Check if MPI is installed by looking for mpicc
-        mpi_check = subprocess.run(
-            ["which", "mpicc"] if platform.system() != "Windows" else ["where", "mpicc"],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
-        if mpi_check.returncode == 0:
-            compile_command.extend(["-I/usr/include/mpi", "-lmpi"])
-    except:
-        # MPI not found, continue without MPI flags
-        pass
-
-    # Add coverage flags for gcov compatibility
-    compile_command.extend(["-fprofile-arcs", "-ftest-coverage"])
-
-    try:
-        result = subprocess.run(
-            compile_command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
-        print(f"Compiled: {test_file} -> {output_exe}")
+        # Check if there's a CMake or Make build system
+        has_cmake = os.path.exists(os.path.join(os.path.dirname(source_dir), "CMakeLists.txt"))
+        has_make = os.path.exists(os.path.join(os.path.dirname(source_dir), "Makefile"))
+        
+        # Extract compiler and flags from build system
+        compiler = "mpicxx"  # Default for MPI C++ programs
+        flags = ["-g", "-O0", "--coverage", "-fprofile-arcs", "-ftest-coverage"]
+        
+        if has_cmake and os.path.exists(build_dir):
+            # Try to extract compiler from CMake cache
+            cmake_cache = os.path.join(build_dir, "CMakeCache.txt")
+            if os.path.exists(cmake_cache):
+                with open(cmake_cache, 'r') as f:
+                    for line in f:
+                        if line.startswith("CMAKE_CXX_COMPILER:"):
+                            compiler = line.split('=')[1].strip()
+                        if line.startswith("CMAKE_CXX_FLAGS:"):
+                            extra_flags = line.split('=')[1].strip()
+                            flags.extend(extra_flags.split())
+        
+        elif has_make:
+            # Try to extract compiler from Makefile
+            with open(os.path.join(os.path.dirname(source_dir), "Makefile"), 'r') as f:
+                makefile = f.read()
+                if "CXX =" in makefile:
+                    for line in makefile.split('\n'):
+                        if line.strip().startswith("CXX ="):
+                            compiler = line.split('=')[1].strip()
+                        if line.strip().startswith("CXXFLAGS ="):
+                            extra_flags = line.split('=')[1].strip()
+                            flags.extend(extra_flags.split())
+        
+        # Remove optimization flags that might interfere with coverage
+        flags = [flag for flag in flags if not flag.startswith('-O') or flag == '-O0']
+        
+        # Add include directories
+        include_dirs = []
+        for root, dirs, files in os.walk(os.path.dirname(source_dir)):
+            for d in dirs:
+                if d.lower() in ['include', 'inc', 'headers']:
+                    include_dirs.append(os.path.join(root, d))
+        
+        include_flags = [f"-I{d}" for d in include_dirs]
+        
+        # Compile the test file
+        output_file = test_file.replace(".cpp", "") if test_file.endswith(".cpp") else test_file.replace(".c", "")
+        
+        cmd = [compiler] + flags + include_flags + ["-o", output_file, test_file]
+        print(f"Compiling with: {' '.join(cmd)}")
+        
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            print(f"Compilation failed: {result.stderr}")
+            return False
+        
         return True
-    except subprocess.CalledProcessError as e:
-        print(f"Failed to compile: {test_file}")
-        error_message = e.stderr.decode() if hasattr(e, 'stderr') else str(e)
-        print(f"Error: {error_message}")
+    except Exception as e:
+        print(f"Error compiling test file: {str(e)}")
         return False
 
 
